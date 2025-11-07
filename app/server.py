@@ -1,5 +1,6 @@
 import json
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import JSONResponse
 from .schemas import AnalysisRequest, FinalReport, MemAddRequest, MemSearchResponse, PrefsMinYieldRequest
 from .orchestrator import run_analysis
 from .memory import MEM, note_from_report, parse_min_yield_from_text, get_latest_min_yield
@@ -10,15 +11,26 @@ app = FastAPI(title="Agentic Multi-Agent Real Estate")
 @app.post("/analyze")
 def analyze(inp: AnalysisRequest):
     raw = run_analysis(inp.query)
+
+    # 1) raw JSON parse
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as je:
         raise HTTPException(422, detail=f"Reporter did not return valid JSON: {je}. Raw: {raw[:300]}")
 
+    # 2) اگر خروجی خطاست، اصلاً به FinalReport تبدیل نکن؛ همان را برگردان
+    if isinstance(data, dict) and data.get("error"):
+        # می‌تونی 200 یا 400 برگردانی. اگر می‌خواهی با curl راحت تست کنی، 200 بد نیست:
+        return JSONResponse(status_code=200, content=data)
+        # اگر دوست داری API رسمی‌تر باشد، 400 هم منطقی است:
+        # return JSONResponse(status_code=400, content=data)
+
+    # 3) در غیر این صورت، FinalReport را اعتبارسنجی کن
     try:
         report = FinalReport(**data)
     except Exception as e:
         raise HTTPException(422, detail=f"Schema validation failed: {str(e)}")
+
     return report
 
 @app.post("/mem/add")

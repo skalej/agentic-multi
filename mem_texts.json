@@ -3,5 +3,6 @@
   "report_style = concise English with numbers and bullet points",
   "baseline rule: if ROI < 7 then warn user",
   "analysis.price=70000.0 | rent=390.0 | costs=150.0 | roi=4.11% | reco=AVOID | critic=rejected",
-  "From now on, set my minimum ROI to 9 percent."
+  "From now on, set my minimum ROI to 9 percent.",
+  "analysis.price=70000 | rent=390 | costs=150 | roi=4.11% | reco=AVOID | critic=rejected"
 ]

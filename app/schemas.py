@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 from pydantic import BaseModel, Field, field_validator
 
 class ROIResult(BaseModel):
@@ -41,3 +41,8 @@ class MemSearchResponse(BaseModel):
 
 class PrefsMinYieldRequest(BaseModel):
     value: float
+
+class ErrorResponse(BaseModel):
+    error: str
+    detail: Any = None
+    parsed: Optional[dict] = None
