@@ -5,32 +5,66 @@ from .schemas import AnalysisRequest, FinalReport, MemAddRequest, MemSearchRespo
 from .orchestrator import run_analysis
 from .memory import MEM, note_from_report, parse_min_yield_from_text, get_latest_min_yield
 from .config import MIN_YIELD_PERCENT
+from fastapi.responses import JSONResponse
+from .schemas import AnalysisRequest, FinalReport, MemAddRequest, MemSearchResponse, PrefsMinYieldRequest, ErrorResponse, ContinueRequest, RecoveryResponse
+from .orchestrator import run_analysis, continue_session
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Agentic Multi-Agent Real Estate")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:5500", "http://localhost:5500", "http://127.0.0.1:5173", "http://localhost:5173", "*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/analyze")
 def analyze(inp: AnalysisRequest):
     raw = run_analysis(inp.query)
 
-    # 1) raw JSON parse
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as je:
         raise HTTPException(422, detail=f"Reporter did not return valid JSON: {je}. Raw: {raw[:300]}")
 
-    # 2) اگر خروجی خطاست، اصلاً به FinalReport تبدیل نکن؛ همان را برگردان
-    if isinstance(data, dict) and data.get("error"):
-        # می‌تونی 200 یا 400 برگردانی. اگر می‌خواهی با curl راحت تست کنی، 200 بد نیست:
+    # NEW: Recovery response (not FinalReport)
+    if isinstance(data, dict) and data.get("need_more_info") is True:
         return JSONResponse(status_code=200, content=data)
-        # اگر دوست داری API رسمی‌تر باشد، 400 هم منطقی است:
-        # return JSONResponse(status_code=400, content=data)
 
-    # 3) در غیر این صورت، FinalReport را اعتبارسنجی کن
+    # Error passthrough (previous behavior)
+    if isinstance(data, dict) and data.get("error"):
+        return JSONResponse(status_code=200, content=data)
+
+    # Otherwise validate FinalReport
     try:
         report = FinalReport(**data)
     except Exception as e:
         raise HTTPException(422, detail=f"Schema validation failed: {str(e)}")
 
+    return report
+
+@app.post("/continue")
+def continue_route(inp: ContinueRequest):
+    raw = continue_session(inp.session_id, inp.reply_text)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as je:
+        raise HTTPException(422, detail=f"Invalid JSON from continue: {je}. Raw: {raw[:300]}")
+
+    # Recovery (need more info)
+    if isinstance(data, dict) and data.get("need_more_info") is True:
+        return JSONResponse(status_code=200, content=data)
+
+    # Error passthrough
+    if isinstance(data, dict) and data.get("error"):
+        return JSONResponse(status_code=200, content=data)
+
+    # FinalReport
+    try:
+        report = FinalReport(**data)
+    except Exception as e:
+        raise HTTPException(422, detail=f"Schema validation failed: {str(e)}")
     return report
 
 @app.post("/mem/add")

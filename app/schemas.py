@@ -46,3 +46,14 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Any = None
     parsed: Optional[dict] = None
+
+class ContinueRequest(BaseModel):
+    session_id: str
+    reply_text: str
+
+class RecoveryResponse(BaseModel):
+    need_more_info: bool
+    session_id: str | None = None
+    ask: str | None = None
+    missing: List[str] | None = None
+    parsed: dict | None = None
